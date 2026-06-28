@@ -2,6 +2,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 typedef unsigned long long formatoBinario;
 formatoBinario memoria[1000];
@@ -9,16 +10,16 @@ FILE *arquivo;
 char linha[100];
 
 struct CPU {
-    unsigned short PC; // Program Counter
-    unsigned short IR; // Instruction Register
+    unsigned short PC;  // Program Counter
+    unsigned short IR;  // Instruction Register
     unsigned short MAR; // Memory Address Register
-    long int MBR; // Memory Buffer Register
-    long int AC; // Acumulador
-    long int M; // Multiplicador
-    long int R; // Resto da divisão
-    bool C; // Carry (0 ou 1)
-    bool N; // 0 (positivo) ou 1 (negativo)
-    bool Z; // 0 (diferente de zero) ou 1 (zero)
+    long int MBR;       // Memory Buffer Register
+    long int AC;        // Acumulador
+    long int M;         // Multiplicador
+    long int R;         // Resto da divisão
+    bool C;             // Carry (0 ou 1)
+    bool N;             // 0 (positivo) ou 1 (negativo)
+    bool Z;             // 0 (diferente de zero) ou 1 (zero)
 };
 
 formatoBinario codificador(char linha[100], int informacao){
@@ -98,7 +99,7 @@ formatoBinario codificador(char linha[100], int informacao){
         palavra = opcode << 12ULL;
         palavra = palavra | informacao;
     }else if(!strcmp(linha, "ADD M(X)")){
-        opcode = 0b000000101;
+        opcode = 0b00000101;
         palavra = opcode << 12ULL;
         palavra = palavra | informacao;
     }else if(!strcmp(linha, "ADD |M(X)|")){
@@ -150,29 +151,28 @@ formatoBinario codificador(char linha[100], int informacao){
     return palavra;
 }
 
-int leitor_arquivo(){
+int gerenciador_memoria(){
     /*Responsável por ler o arquivo e devolver uma linha*/
     FILE *arquivo = fopen("programa.txt", "r");
     char caractere;
     formatoBinario palavra;
-    int posicao_dados = 0;
-    int posicao_instrucao = 100;
+    int posicao_dados = 0, posicao_instrucao = 100;
     int flag_instrucao = 0;
-    int i = 0;//indica a prosição onde o próximo caractere vai ser inserido
-    int fim_informacao = 0; //flag que indica se o endereço já foi extraido
-    int informacao = 0; //pode ser um endereço ou um dado
-    int numero; //buffer que armazena o caractere convertido para inteiro
+    int i = 0;              // indica a posição onde o próximo caractere vai ser inserido
+    int fim_informacao = 0; // flag que indica se o endereço já foi extraido
+    int informacao = 0;     // pode ser um endereço ou um dado
+    int numero;             // buffer que armazena o caractere convertido para inteiro
     int teste = 0;
 
     if (arquivo == NULL) {
-        printf("Erro ao abrir arquivo.\n");
+        printf("ERRO : Arquivo invalido/nao encontrado.\n");
         return 1;
     }
     
     while ((caractere = fgetc(arquivo)) != EOF){
         if (caractere == '\r') continue; // Ignora o lixo do Windows
         if(caractere != '\n'){
-            if((caractere >= '0' && caractere <= '9') && !fim_informacao){
+            if((caractere >= '0' && caractere <= '9') && !fim_informacao) {
                 if(informacao){
                     numero = caractere - '0';
                     informacao = informacao * 10 + numero;
@@ -195,25 +195,22 @@ int leitor_arquivo(){
             i = 0;
             palavra = codificador(linha, informacao);
             if(linha[0] == ' ' || linha[0] == '-'){
+                if (posicao_dados == 100) {printf("ERRO LOGICO:\n - Este computador NÃO suporta mais de 100 dados."); }
                 memoria[posicao_dados] = palavra;
                 teste = posicao_dados;
                 posicao_dados++;
+
             }else{
                 
-                if(flag_instrucao){//indica se a posição atual da memória precisa de mais uma instrução
+                if(flag_instrucao){ //indica se a posição atual da memória precisa de mais uma instrução
                     memoria[posicao_instrucao] = memoria[posicao_instrucao] | palavra;
-                    teste = posicao_instrucao;
                     posicao_instrucao++;
                     flag_instrucao = 0;
                 }else{
                     memoria[posicao_instrucao] = palavra << 20ULL;
-                    teste = posicao_instrucao;
                     flag_instrucao = 1;
-                }//essas verificações não vem se eu já estorei o tamanho da memória ou se passei do limite da area de dados, vou mexer nisso depois
+                } //essas verificações não vem se eu já estorei o tamanho da memória ou se passei do limite da area de dados, vou mexer nisso depois
             }
-            printf("\nLinha: %s", linha);//print de teste pode apagar
-            printf("\nPalavra: %llu", palavra);
-            printf("\nMemoria: %llu\n", memoria[teste]);
             informacao = 0;
             fim_informacao = 0;
         }
@@ -223,24 +220,105 @@ int leitor_arquivo(){
     return 0;
 }
 
-void gerenciador_memoria(){
-    /*Responsavel por armazenar dados e instruções na memória principal*/
-    // FILE *arquivo = fopen("programa.txt", "r");
-    // char c;
+void executor(formatoBinario codigo, struct CPU cpu) {
+    formatoBinario opcode = codigo >> 12ULL;
+    formatoBinario mascara = (1ULL << 12)-1;
+    
+    if(codigo == 0b00001010){       // LOAD MQ
+        cpu.AC = cpu.M;
 
-    // if (arquivo == NULL) {
-    //     printf("Erro ao abrir arquivo.\n");
-    //     return 1;
-    // }
+    }else if(opcode == 0b00001001){ // LOAD MQ.M(X)
+        formatoBinario mascara = (1ULL << 12)-1;
+        int informacao = codigo & mascara;
+        cpu.M = memoria[informacao];
+
+    }else if(opcode == 0b00100001){ // STOR M(X)
+        formatoBinario mascara = (1ULL << 12)-1;
+        int informacao = codigo & mascara;
+        memoria[informacao] = cpu.AC;
+
+    }else if(opcode == 0b00000001){ // LOAD M(X)
+        formatoBinario mascara = (1ULL << 12)-1;
+        int informacao = codigo & mascara;
+        cpu.AC = memoria[informacao];
+
+    }else if(opcode == 0b00000010){ // LOAD-M(X)
+        formatoBinario mascara = (1ULL << 12)-1;
+        int informacao = codigo & mascara;
+        cpu.AC = memoria[informacao] * -1;
+
+    }else if(opcode == 0b00000011){ // LOAD |M(X)|
+        formatoBinario mascara = (1ULL << 12)-1;
+        int informacao = codigo & mascara;
+        cpu.AC = abs(memoria[informacao]);
+
+    }else if(opcode == 0b00000100){ // LOAD-|M(X)|
+        formatoBinario mascara = (1ULL << 12)-1;
+        int informacao = codigo & mascara;
+        cpu.AC = abs(memoria[informacao]) * -1;
         
-    // while (fgets(linha, sizeof(linha), arquivo) != NULL) {
-    //     printf("%s", linha); // Exibe a linha na tela
-    // }
+    }else if(opcode == 0b00001101){ // JUMP M(X,0:19)   TODOS OS JUMPS TENHO Q REVER AINDA
+        formatoBinario mascara = (1ULL << 12)-1;
+        int informacao = codigo & mascara;
+        cpu.PC = informacao;
 
-    // fclose(arquivo);
-    // return 0;
+    }else if(opcode == 0b00001110){ // JUMP M(X,20:39)
+        formatoBinario mascara = (1ULL << 12)-1;
+        int informacao = codigo & mascara;
+        cpu.PC = informacao;
 
+    }else if(opcode == 0b00001111){ // JUMP+M(X,0:19)
+        if (cpu.AC >= 0) {
+            formatoBinario mascara = (1ULL << 12)-1;
+            int informacao = codigo & mascara;
+            cpu.PC = informacao;
+        }
+
+    }else if(opcode == 0b00010000){ // JUMP+M(X,20:39)
+        if (cpu.AC >= 0) {
+            formatoBinario mascara = (1ULL << 12)-1;
+            int informacao = codigo & mascara;
+            cpu.PC = informacao;
+        }
+
+    }else if(opcode == 0b00000101){ // ADD M(X)
+        formatoBinario mascara = (1ULL << 12)-1;
+        int informacao = codigo & mascara;
+        cpu.AC += memoria[informacao];
+
+    }else if(opcode == 0b00000111){ // ADD |M(X)|
+        formatoBinario mascara = (1ULL << 12)-1;
+        int informacao = codigo & mascara;
+        cpu.AC += abs(memoria[informacao]);
+
+
+    }else if(opcode == 0b00000110){ // SUB M(X)
+        
+    }else if(opcode == 0b00001000){ // SUB |M(X)|
+        
+    }else if(opcode == 0b00001011){ // MUL M(X)
+        
+    }else if(opcode == 0b00001100){ // DIV M(X)
+        
+    }else if(opcode == 0b00010100){ // LSH
+        
+    }else if(opcode == 0b00010101){ // RSH
+        
+    }else if(opcode == 0b00010010){ // STOR M(X,8:19)
+        
+    }else if(opcode == 0b00010011){ // STOR M(X,28:39)
+        
+    }else{
+        // if(linha[0] == '-'){
+        //     numero_negativo = informacao * -1;
+        //     mascara = (1ULL << 40) - 1;
+        //     palavra = numero_negativo & mascara;
+        // }else{
+            formatoBinario palavra = codigo;
+        // }
+    }
 }
+
 /*
 void load_MQ () {
     AC = M; }
@@ -280,6 +358,6 @@ void stor_Mx_dir () {}
 
 void main() {
 
-leitor_arquivo();
+gerenciador_memoria();
 
 }
