@@ -248,7 +248,6 @@ int gerenciador_memoria(){
 }
 
 
-
 void ciclo_busca() {
     if (cpu.leituraCompleta) {
         if (cpu.LorR) {                             // Falta executar instrucao da esquerda
@@ -369,17 +368,18 @@ void ciclo_execucao() {
 
 void ciclo_instrucao(formatoBinario codigo){
     ciclo_busca();
+    
     ciclo_execucao();
 }
 
 
 void cpu_print(int i){
-    printf(" - %d esimo(a) execucao.", i);
+    printf(" - %desima execucao.", i);
     printf("\n - MBR : %lu", cpu.MBR);
     printf("\n - AC  : %lu  |  MQ  : %lu", cpu.AC, cpu.MQ);
     printf("\n - IBR : %hu", cpu.IBR);
     printf("\n - IR  : %hu  |  MAR : %hu", cpu.IR, cpu.MAR);
-    printf("\n - PC  : %hu", cpu.PC);
+    printf("\n - PC  : %hu\n\n", cpu.PC);
 }
 
 void main() {
@@ -387,13 +387,12 @@ void main() {
     
     criar_CPU();
     if (gerenciador_memoria()) return;
-    
-
 
     int i = 0;
-    while (memoria[100 + i] != 0b0000000000000000000000000000000000000000);
+    while (memoria[100 + i] != 0b0000000000000000000000000000000000000000) {
         ciclo_instrucao(memoria[100+i]);
+        cpu_print(i);
         i++;
-    
-    printf("\n\n\n ========================== FIM DO PROGRAMA ==========================\n\n");
+    }
+    printf("\n ========================== FIM DO PROGRAMA ==========================\n\n");
 }
