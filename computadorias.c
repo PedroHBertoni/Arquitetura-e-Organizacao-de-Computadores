@@ -383,8 +383,17 @@ void cpu_print(int i){
 }
 
 void main() {
-    criar_CPU();
-    gerenciador_memoria();
-
+    printf("\n\n ====================== INICIANDO COMPUTADOR IAS ======================\n\n\n");
     
+    criar_CPU();
+    if (gerenciador_memoria()) return;
+    
+
+
+    int i = 0;
+    while (memoria[100 + i] != 0b0000000000000000000000000000000000000000);
+        ciclo_instrucao(memoria[100+i]);
+        i++;
+    
+    printf("\n\n\n ========================== FIM DO PROGRAMA ==========================\n\n");
 }
