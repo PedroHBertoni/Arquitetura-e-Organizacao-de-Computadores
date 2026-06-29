@@ -20,29 +20,29 @@ formatoBinario MASCARA_20_27Bits = 0b1111111111111111111100000000111111111111;
 formatoBinario MASCARA_28_39Bits = 0b1111111111111111111111111111000000000000;
 
 struct CPU {
-    unsigned short PC;  // Program Counter                      12 bits
+    unsigned short PC;    // Program Counter                      12 bits
     
-    unsigned short IR;  // Instruction Register                 8  bits
-    unsigned short MAR; // Memory Address Register              12 bits
-    unsigned short IBR; // Instruction Buffer Register          20 bits
+    unsigned short IR;    // Instruction Register                 8  bits
+    unsigned short MAR;   // Memory Address Register              12 bits
+    unsigned short IBR;   // Instruction Buffer Register          20 bits
     
-    long int MBR;       // Memory Buffer Register               40 bits
-    long int AC;        // Acumulador                           40 bits
-    long int MQ;        // Multiplicador Quociente              40 bits
+    long int MBR;         // Memory Buffer Register               40 bits
+    long int AC;          // Acumulador                           40 bits
+    long int MQ;          // Multiplicador Quociente              40 bits
 
-    bool LorR;          // 0 instrucao de IR, 1 instr de IBR    1  bit FLAG
-    bool leituraCompleta// 0 le so a direita, 1 le esq+dir      1  bit FLAG
+    bool LorR;            // 0 instrucao de IR, 1 instr de IBR    1  bit FLAG
+    bool leituraCompleta; // 0 le so a direita, 1 le esq+dir      1  bit FLAG
 } cpu;
 
 void criar_CPU() {
     cpu.AC  = 0b0 << 40ULL;
     cpu.MQ  = 0b0 << 40ULL;
     cpu.MBR = 0b0 << 40ULL;
-    cpu.PC  = 0b0 << 12ULL;
+    cpu.PC  = 0b0 << 12;
 
-    cpu.MAR = 0b0 << 12ULL;
-    cpu.IR  = 0b0 <<  8ULL;
-    cpu.IBR = 0b0 << 20ULL;
+    cpu.MAR = 0b0 << 12;
+    cpu.IR  = 0b0 <<  8;
+    cpu.IBR = 0b0 << 20;
 
     cpu.LorR = 0;
     cpu.leituraCompleta = 1;
@@ -166,8 +166,7 @@ formatoBinario codificador(char linha[100], int informacao){
     }else{
         if(linha[0] == '-'){
             numero_negativo = informacao * -1;
-            mascara = (1ULL << 40) - 1;
-            palavra = numero_negativo & mascara;
+            palavra = numero_negativo & MASCARA_40Bits;
         }else{
             palavra = 0ULL;
             palavra = palavra << 39;
@@ -243,7 +242,7 @@ int gerenciador_memoria(){
     }
 
     fclose(arquivo);
-    memoria[posicao_instrucao] = 0b0 << 39;
+    memoria[posicao_instrucao] = 0b0000000000000000000000000000000000000000;
     return 0;
 }
 
@@ -265,7 +264,7 @@ void ciclo_busca() {
             cpu.IBR =  cpu.MBR & MASCARA_20Bits;
             cpu.LorR = 1;
         }
-    } else {
+    } else {                                        // Especifico pro JUMP (X, 20:39)
         cpu.MAR = cpu.PC;
         cpu.MBR = memoria[cpu.MAR];
 
@@ -392,6 +391,7 @@ void main() {
     while (memoria[100 + i] != 0b0000000000000000000000000000000000000000) {
         ciclo_instrucao(memoria[100+i]);
         cpu_print(i);
+        getchar();
         i++;
     }
     printf("\n ========================== FIM DO PROGRAMA ==========================\n\n");
