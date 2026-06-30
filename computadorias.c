@@ -35,14 +35,14 @@ struct CPU {
 } cpu;
 
 void criar_CPU() {
-    cpu.AC  = 0b0 << 40ULL;
-    cpu.MQ  = 0b0 << 40ULL;
-    cpu.MBR = 0b0 << 40ULL;
-    cpu.PC  = 0b0 << 12;
+    cpu.AC  = 0ULL;;
+    cpu.MQ  = 0ULL;
+    cpu.MBR = 0ULL;
+    cpu.PC  = 0b000001100100;  // Comeco da posicao 100 na memoria
 
-    cpu.MAR = 0b0 << 12;
-    cpu.IR  = 0b0 <<  8;
-    cpu.IBR = 0b0 << 20;
+    cpu.MAR = 0 << 12;
+    cpu.IR  = 0 <<  8;
+    cpu.IBR = 0 << 20;
 
     cpu.LorR = 0;
     cpu.leituraCompleta = 1;
@@ -56,31 +56,6 @@ formatoBinario codificador(char linha[100], int informacao){
     formatoBinario palavra;
     long long numero_negativo;
     long long mascara = 0;
-
-    // int resultado;
-    // int resto;
-    // int flag = 0;
-    // int fator_aumento = 1;
-
-    // while(informacao != 1){
-    //     resto = informacao % 2;
-    //     if(resto == 1){
-    //         informacao = informacao - 1;
-    //         informacao = informacao / 2;
-    //         flag = 1;
-    //     }else{
-    //         informacao = informacao / 2;
-    //         flag = 0;
-    //     }
-
-    //     if(flag){
-    //         informacao_binario = informacao_binario + fator_aumento;
-    //     }
-
-    //     fator_aumento = fator_aumento * 10;
-    // }
-
-    // informacao_binario = informacao_binario + fator_aumento;
     
     if(!strcmp(linha, "LOAD MQ")){
         opcode = 0b00001010;
@@ -220,7 +195,7 @@ int gerenciador_memoria(){
             linha[i] = '\0';
             i = 0;
             palavra = codificador(linha, informacao);
-            if(linha[0] == ' ' || linha[0] == '-'){
+            if(linha[0] == '\0' || linha[0] == '-'){
                 if (posicao_dados == 100) {printf("ERRO LOGICO:\n - Este computador NÃO suporta mais de 100 dados."); }
                 memoria[posicao_dados] = palavra;
                 posicao_dados++;
@@ -242,7 +217,7 @@ int gerenciador_memoria(){
     }
 
     fclose(arquivo);
-    memoria[posicao_instrucao] = 0b0000000000000000000000000000000000000000;
+    memoria[posicao_instrucao] = 0ULL;
     return 0;
 }
 
@@ -259,8 +234,8 @@ void ciclo_busca() {
             cpu.MAR = cpu.PC;
             cpu.MBR = memoria[cpu.MAR];
 
-            cpu.IR  = (cpu.MBR >> 32ULL);
-            cpu.MAR = (cpu.MBR >> 20ULL) & MASCARA_Endereco;
+            cpu.IR  = cpu.MBR & MASCARA_00_07Bits;
+            cpu.MAR = cpu.MBR & MASCARA_08_19Bits;
             cpu.IBR =  cpu.MBR & MASCARA_20Bits;
             cpu.LorR = 1;
         }
@@ -360,12 +335,12 @@ void ciclo_execucao() {
 
     }else if(opcode == 0b00000000){
 
-        printf("ERRO : Opcode nao identificado.");
+        printf("O código chegou ao fim");
     } 
     return;
 }
 
-void ciclo_instrucao(formatoBinario codigo){
+void ciclo_instrucao(){
     ciclo_busca();
     
     ciclo_execucao();
@@ -381,6 +356,61 @@ void cpu_print(int i){
     printf("\n - PC  : %hu\n\n", cpu.PC);
 }
 
+void imprime_memoria(){
+    int resto;
+    int i = 0, j, k, inicio_binario = 0;
+    unsigned long long informacao;
+    char informacao_binario[41];
+
+    printf("\n===== Dados na memoria =====\n\n");
+
+    while(i < 100){
+        printf("\n%llu", memoria[i]);
+        i++;
+    }
+
+    printf("\n===== Instrucoes na memoria =====\n\n");
+    informacao_binario[40] = '\0';
+    for(int a = 0; a < 40; a++){
+        informacao_binario[a] = '0';
+    }
+    while(i < 1000 && memoria[i] != 0ULL){
+        informacao = memoria[i];
+        j = 39;
+        k = 0;
+
+        printf("INSTRUCAO A ESQUERDA  INSTRUCAO A DIREITA\n");
+        while(informacao != 1){
+            resto = informacao % 2;
+            if(resto == 1){
+                informacao = informacao - 1;
+                informacao = informacao / 2;
+                informacao_binario[j] = '1';
+            }else{
+                informacao = informacao / 2;
+                informacao_binario[j] = '0';
+            }
+            j--;
+        }
+
+        informacao_binario[j] = '1';
+
+        while(k < 40){
+
+            if(k == 8 || k == 20 || k == 28){
+                printf(" ");
+            }
+
+            printf("%c", informacao_binario[k]);
+
+            
+            k++;
+        }
+        printf("\n");
+        i++;
+    }
+}
+
 void main() {
     printf("\n\n ====================== INICIANDO COMPUTADOR IAS ======================\n\n\n");
     
@@ -388,11 +418,31 @@ void main() {
     if (gerenciador_memoria()) return;
 
     int i = 0;
-    while (memoria[100 + i] != 0b0000000000000000000000000000000000000000) {
-        ciclo_instrucao(memoria[100+i]);
-        cpu_print(i);
-        getchar();
-        i++;
+    int j = 100;
+    int opcao;
+
+    printf("Deseja realizar a vizualização completa da execução ? (1-SIM, 0-NAO)");
+    scanf("%i", &opcao);
+
+    getchar();
+    
+    if(opcao){
+        do{
+            ciclo_instrucao();
+            cpu_print(i);
+            getchar();
+            i++;
+        }while (cpu.IR != 0b00000000);
+    }else{
+        do{
+            ciclo_instrucao();
+            cpu_print(i);
+            i++;
+        }while (cpu.IR != 0b00000000);
     }
+    
+
+    imprime_memoria();
+
     printf("\n ========================== FIM DO PROGRAMA ==========================\n\n");
 }
