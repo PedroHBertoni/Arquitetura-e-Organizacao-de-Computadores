@@ -9,7 +9,7 @@ formatoBinario memoria[1000];
 FILE *arquivo;
 char linha[100];
 
-formatoBinario MASCARA_Endereco  = 0b00000000111111111111;
+formatoBinario MASCARA_Endereco  = 0b111111111111;
 formatoBinario MASCARA_Opcode    = 0b11111111000000000000;
 formatoBinario MASCARA_40Bits    = 0b1111111111111111111111111111111111111111;
 formatoBinario MASCARA_20Bits    = 0b0000000000000000000011111111111111111111;
@@ -19,6 +19,8 @@ formatoBinario MASCARA_08_19Bits = 0b1111111100000000000011111111111111111111;
 formatoBinario MASCARA_20_27Bits = 0b1111111111111111111100000000111111111111;
 formatoBinario MASCARA_28_39Bits = 0b1111111111111111111111111111000000000000;
 
+formatoBinario MASCARA_SEGURANCA_OPCODE = 0b11111111;
+
 struct CPU {
     unsigned short PC;    // Program Counter                      12 bits
     
@@ -26,9 +28,9 @@ struct CPU {
     unsigned short MAR;   // Memory Address Register              12 bits
     unsigned short IBR;   // Instruction Buffer Register          20 bits
     
-    long int MBR;         // Memory Buffer Register               40 bits
-    long int AC;          // Acumulador                           40 bits
-    long int MQ;          // Multiplicador Quociente              40 bits
+    unsigned long long MBR;         // Memory Buffer Register               40 bits
+    long long AC;          // Acumulador                           40 bits
+    long long MQ;          // Multiplicador Quociente              40 bits
 
     bool LorR;            // 0 instrucao de IR, 1 instr de IBR    1  bit FLAG
     bool leituraCompleta; // 0 le so a direita, 1 le esq+dir      1  bit FLAG
@@ -217,6 +219,9 @@ int gerenciador_memoria(){
     }
 
     fclose(arquivo);
+    if(flag_instrucao){
+        posicao_instrucao++;
+    }
     memoria[posicao_instrucao] = 0ULL;
     return 0;
 }
@@ -224,8 +229,8 @@ int gerenciador_memoria(){
 
 void ciclo_busca() {
     if (cpu.leituraCompleta) {
-        if (cpu.LorR) {                             // Falta executar instrucao da esquerda
-            cpu.IR  = cpu.IBR >> 12ULL;
+        if (cpu.LorR) {                             // Falta executar instrucao da DIREITA
+            cpu.IR  = (cpu.IBR >> 12ULL) & MASCARA_SEGURANCA_OPCODE;
             cpu.MAR = cpu.IBR & MASCARA_Endereco;
 
             cpu.PC++;
@@ -234,8 +239,8 @@ void ciclo_busca() {
             cpu.MAR = cpu.PC;
             cpu.MBR = memoria[cpu.MAR];
 
-            cpu.IR  = cpu.MBR & MASCARA_00_07Bits;
-            cpu.MAR = cpu.MBR & MASCARA_08_19Bits;
+            cpu.IR  = (cpu.MBR >> 32) & MASCARA_SEGURANCA_OPCODE; //colocar o endereço no IR
+            cpu.MAR = (cpu.MBR >> 20) & MASCARA_Endereco;
             cpu.IBR =  cpu.MBR & MASCARA_20Bits;
             cpu.LorR = 1;
         }
@@ -243,7 +248,7 @@ void ciclo_busca() {
         cpu.MAR = cpu.PC;
         cpu.MBR = memoria[cpu.MAR];
 
-        cpu.IR  = cpu.MBR >> 12ULL;
+        cpu.IR  = (cpu.MBR >> 12ULL) & MASCARA_SEGURANCA_OPCODE;
         cpu.MAR = cpu.MBR & MASCARA_Endereco;
 
         cpu.PC++;
@@ -283,17 +288,19 @@ void ciclo_execucao() {
 
     }else if(opcode == 0b00001110){ // JUMP M(X,20:39)
         cpu.PC = endereco;
+        cpu.LorR = 1;
         cpu.leituraCompleta = 0;
 
     }else if(opcode == 0b00001111){ // JUMP+M(X,0:19)
-        if (cpu.AC >= 0) {
+        if ((cpu.AC & (1ULL << 39)) == 0) {
             cpu.PC = endereco;
             cpu.LorR = 0;
         }
 
     }else if(opcode == 0b00010000){ // JUMP+M(X,20:39)
-        if (cpu.AC >= 0) {
+        if ((cpu.AC & (1ULL << 39)) == 0) {
             cpu.PC = endereco;
+            cpu.LorR = 1;
             cpu.leituraCompleta = 0;
         }
 
@@ -310,8 +317,9 @@ void ciclo_execucao() {
         cpu.AC -= abs(memoria[endereco]);
 
     }else if(opcode == 0b00001011){ // MUL M(X)
-        cpu.MQ = (cpu.MQ * memoria[endereco]) & MASCARA_40Bits;  // Nao sei se cpu.MQ * memoria[endereco] cabe na memoria
-        cpu.AC = (cpu.MQ * memoria[endereco]) >> 40ULL;
+        unsigned long long resultado_mul = (unsigned long long)cpu.MQ * (unsigned long long)memoria[endereco];
+        cpu.MQ = resultado_mul & MASCARA_40Bits;
+        cpu.AC = (resultado_mul >> 40ULL) & MASCARA_40Bits;
 
     }else if(opcode == 0b00001100){ // DIV M(X)
         cpu.AC /= memoria[endereco];
@@ -336,6 +344,7 @@ void ciclo_execucao() {
     }else if(opcode == 0b00000000){
 
         printf("O código chegou ao fim");
+        cpu.IR = 0;
     } 
     return;
 }
@@ -349,8 +358,8 @@ void ciclo_instrucao(){
 
 void cpu_print(int i){
     printf(" - %desima execucao.", i);
-    printf("\n - MBR : %lu", cpu.MBR);
-    printf("\n - AC  : %lu  |  MQ  : %lu", cpu.AC, cpu.MQ);
+    printf("\n - MBR : %llu", cpu.MBR);
+    printf("\n - AC  : %llu  |  MQ  : %llu", cpu.AC, cpu.MQ);
     printf("\n - IBR : %hu", cpu.IBR);
     printf("\n - IR  : %hu  |  MAR : %hu", cpu.IR, cpu.MAR);
     printf("\n - PC  : %hu\n\n", cpu.PC);
