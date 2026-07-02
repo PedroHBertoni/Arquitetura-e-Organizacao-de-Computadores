@@ -343,12 +343,12 @@ void ciclo_execucao() {
         cpu.AC = cpu.AC >> 1;
         
     }else if(opcode == 0b00010010){ // STOR M(X,8:19)
-        int informacao = (cpu.AC & MASCARA_Endereco) << 20ULL;
+        unsigned long long informacao = (cpu.AC & MASCARA_Endereco) << 20ULL;
         memoria[endereco] = memoria[endereco] & MASCARA_08_19Bits;
         memoria[endereco] = memoria[endereco] | informacao;
         
     }else if(opcode == 0b00010011){ // STOR M(X,28:39)
-        int informacao = cpu.AC & MASCARA_Endereco;
+        unsigned long long informacao = cpu.AC & MASCARA_Endereco;
         memoria[endereco] = memoria[endereco] & MASCARA_28_39Bits;
         memoria[endereco] = memoria[endereco] | informacao;
 
