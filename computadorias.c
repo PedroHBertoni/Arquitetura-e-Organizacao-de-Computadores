@@ -26,7 +26,7 @@ struct CPU {
     
     unsigned short IR;    // Instruction Register                 8  bits
     unsigned short MAR;   // Memory Address Register              12 bits
-    unsigned short IBR;   // Instruction Buffer Register          20 bits
+    unsigned int IBR;   // Instruction Buffer Register          20 bits
     
     unsigned long long MBR;         // Memory Buffer Register               40 bits
     long long AC;          // Acumulador                           40 bits
@@ -165,6 +165,11 @@ int gerenciador_memoria(){
     int fim_informacao = 0; // flag que indica se o endereço já foi extraido
     int informacao = 0;     // pode ser um endereço ou um dado
     int numero;             // buffer que armazena o caractere convertido para inteiro
+    int ultima_instrucao = 0;
+
+    for(int p = 0; p < 1000; p++){
+        memoria[p] = 0ULL;
+    }
 
 
     if (arquivo == NULL) {
@@ -172,8 +177,14 @@ int gerenciador_memoria(){
         return 1;
     }
     
-    while ((caractere = fgetc(arquivo)) != EOF){
-        if (caractere == '\r') continue; // Ignora o lixo do Windows
+    while (!ultima_instrucao){
+        //if (caractere == '\r') continue;  Ignora o lixo do Windows
+
+        if((caractere = fgetc(arquivo)) == EOF){
+            ultima_instrucao = 1;
+            caractere = '\n';
+        }
+
         if(caractere != '\n'){
             if((caractere >= '0' && caractere <= '9') && !fim_informacao) {
                 if(informacao){
@@ -198,7 +209,7 @@ int gerenciador_memoria(){
             i = 0;
             palavra = codificador(linha, informacao);
             if(linha[0] == '\0' || linha[0] == '-'){
-                if (posicao_dados == 100) {printf("ERRO LOGICO:\n - Este computador NÃO suporta mais de 100 dados."); }
+                if (posicao_dados == 100) {printf("ERRO LOGICO:\n - Este computador NAO suporta mais de 100 dados."); }
                 memoria[posicao_dados] = palavra;
                 posicao_dados++;
 
@@ -226,11 +237,10 @@ int gerenciador_memoria(){
     return 0;
 }
 
-
 void ciclo_busca() {
     if (cpu.leituraCompleta) {
         if (cpu.LorR) {                             // Falta executar instrucao da DIREITA
-            cpu.IR  = (cpu.IBR >> 12ULL) & MASCARA_SEGURANCA_OPCODE;
+            cpu.IR  = (cpu.IBR >> 12) & MASCARA_SEGURANCA_OPCODE;
             cpu.MAR = cpu.IBR & MASCARA_Endereco;
 
             cpu.PC++;
@@ -242,6 +252,7 @@ void ciclo_busca() {
             cpu.IR  = (cpu.MBR >> 32) & MASCARA_SEGURANCA_OPCODE; //colocar o endereço no IR
             cpu.MAR = (cpu.MBR >> 20) & MASCARA_Endereco;
             cpu.IBR =  cpu.MBR & MASCARA_20Bits;
+            cpu.IBR = cpu.IBR & 0b11111111111111111111;
             cpu.LorR = 1;
         }
     } else {                                        // Especifico pro JUMP (X, 20:39)
@@ -317,7 +328,7 @@ void ciclo_execucao() {
         cpu.AC -= abs(memoria[endereco]);
 
     }else if(opcode == 0b00001011){ // MUL M(X)
-        unsigned long long resultado_mul = (unsigned long long)cpu.MQ * (unsigned long long)memoria[endereco];
+        long long resultado_mul = cpu.MQ * memoria[endereco];
         cpu.MQ = resultado_mul & MASCARA_40Bits;
         cpu.AC = (resultado_mul >> 40ULL) & MASCARA_40Bits;
 
@@ -343,7 +354,7 @@ void ciclo_execucao() {
 
     }else if(opcode == 0b00000000){
 
-        printf("O código chegou ao fim");
+        printf("O codigo chegou ao fim");
         cpu.IR = 0;
     } 
     return;
@@ -388,7 +399,7 @@ void imprime_memoria(){
         j = 39;
         k = 0;
 
-        printf("INSTRUCAO A ESQUERDA  INSTRUCAO A DIREITA\n");
+        printf("\nINSTRUCAO A ESQUERDA  INSTRUCAO A DIREITA\n");
         while(informacao != 1){
             resto = informacao % 2;
             if(resto == 1){
@@ -430,7 +441,7 @@ void main() {
     int j = 100;
     int opcao;
 
-    printf("Deseja realizar a vizualização completa da execução ? (1-SIM, 0-NAO)");
+    printf("Deseja realizar a vizualizacao completa da execucao ? (1-SIM, 0-NAO)");
     scanf("%i", &opcao);
 
     getchar();
